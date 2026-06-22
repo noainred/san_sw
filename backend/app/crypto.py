@@ -82,3 +82,18 @@ def decrypt(value: str | None) -> str | None:
 
 def is_encrypted(value: str | None) -> bool:
     return bool(value) and value.startswith(ENC_PREFIX)
+
+
+# ------------------------------------------------------------ 세션 토큰
+
+def make_session_token(payload: str) -> str:
+    """payload를 Fernet으로 봉인한 세션 토큰(만료시각 내장)."""
+    return _get_fernet().encrypt(payload.encode()).decode()
+
+
+def read_session_token(token: str, ttl: int) -> str | None:
+    """토큰 검증 + 만료(ttl초) 확인. 실패 시 None."""
+    try:
+        return _get_fernet().decrypt(token.encode(), ttl=ttl).decode()
+    except Exception:  # noqa: BLE001 - 위조/만료 모두 None 처리
+        return None

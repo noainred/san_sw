@@ -54,7 +54,31 @@ body {
 .btn-ghost { background: transparent; }
 .btn-sm { padding: 3px 8px; font-size: 12px; }
 
+/* 탭 */
+.tabs { display: flex; gap: 4px; padding: 0 20px; background: var(--panel);
+  border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tab { background: transparent; border: none; color: var(--muted);
+  padding: 12px 16px; cursor: pointer; font-size: 14px;
+  border-bottom: 2px solid transparent; white-space: nowrap; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-section { display: none; }
+.tab-section.active { display: block; }
+
 .container { max-width: 1280px; margin: 0 auto; padding: 20px; }
+
+/* 지도/토폴로지 */
+.map-wrap, .topo-wrap { padding: 12px 16px; }
+#world-map, #topo-svg { width: 100%; height: auto; border-radius: 8px;
+  background: #0d1b2a; }
+
+/* 칩 */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 16px; }
+.chip { background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 14px; padding: 4px 12px; font-size: 13px; }
+.rep-body { padding: 16px; }
+.rep-body h3 { font-size: 14px; margin: 16px 0 6px; }
+.card.warn .value { color: var(--warn); }
 
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 22px; }
 .cards.small { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 12px 0; }
@@ -123,6 +147,7 @@ td.clickable { color: var(--accent); cursor: pointer; }
 .dot.used { background: var(--used); }
 .dot.free { background: var(--free); }
 .dot.error { background: var(--error); }
+.dot.warn2 { background: var(--warn); }
 
 .port-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; }
 .port {
@@ -132,6 +157,7 @@ td.clickable { color: var(--accent); cursor: pointer; }
 }
 .port.used { border-left-color: var(--used); }
 .port.error { border-left-color: var(--error); }
+.port.warn { border-left-color: var(--warn); }
 .port .pname { font-weight: 700; font-family: ui-monospace, monospace; }
 .port .pspeed { color: var(--muted); }
 .port .ptype { color: var(--accent); font-size: 10px; }

@@ -74,9 +74,95 @@ CREATE TABLE IF NOT EXISTS port_counters (
     PRIMARY KEY (switch_id, name)
 );
 
+-- 사용자/RBAC
+CREATE TABLE IF NOT EXISTS users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    username      TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'viewer',   -- admin|operator|viewer
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 감사 로그(변경 이력)
+CREATE TABLE IF NOT EXISTS audit_log (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts       TEXT NOT NULL DEFAULT (datetime('now')),
+    username TEXT,
+    action   TEXT NOT NULL,
+    target   TEXT,
+    detail   TEXT
+);
+
+-- 알림 규칙
+CREATE TABLE IF NOT EXISTS alert_rules (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL,
+    metric     TEXT NOT NULL,        -- occupancy_pct|error_ports|crc_errors|
+                                     -- sfp_rx_power_dbm|switch_unreachable
+    comparator TEXT NOT NULL DEFAULT '>',  -- > | < | >= | <= | ==
+    threshold  REAL NOT NULL DEFAULT 0,
+    severity   TEXT NOT NULL DEFAULT 'warning',  -- info|warning|critical
+    enabled    INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 발생 알림 이력
+CREATE TABLE IF NOT EXISTS alerts (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts        TEXT NOT NULL DEFAULT (datetime('now')),
+    rule_id   INTEGER,
+    switch_id INTEGER,
+    severity  TEXT NOT NULL DEFAULT 'warning',
+    message   TEXT NOT NULL,
+    value     REAL,
+    resolved  INTEGER NOT NULL DEFAULT 0
+);
+
+-- ISL(스위치 간 E_Port 연결) 토폴로지
+CREATE TABLE IF NOT EXISTS isl_links (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    switch_id       INTEGER NOT NULL REFERENCES switches(id) ON DELETE CASCADE,
+    local_port      TEXT,
+    remote_wwn      TEXT,
+    remote_switch_id INTEGER,
+    speed_gbps      REAL,
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 구성 백업
+CREATE TABLE IF NOT EXISTS config_backups (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    switch_id INTEGER NOT NULL REFERENCES switches(id) ON DELETE CASCADE,
+    ts        TEXT NOT NULL DEFAULT (datetime('now')),
+    filename  TEXT,
+    size      INTEGER,
+    content   TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_ports_switch ON ports(switch_id);
 CREATE INDEX IF NOT EXISTS idx_samples_switch_ts ON samples(switch_id, ts);
+CREATE INDEX IF NOT EXISTS idx_alerts_ts ON alerts(ts);
+CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts);
+CREATE INDEX IF NOT EXISTS idx_isl_switch ON isl_links(switch_id);
 """
+
+# 기존 DB(이전 버전)에 새 컬럼을 추가하기 위한 마이그레이션 정의.
+_COLUMN_MIGRATIONS = {
+    "ports": {
+        "crc_errors": "INTEGER",
+        "enc_out_errors": "INTEGER",
+        "link_failures": "INTEGER",
+        "loss_of_sync": "INTEGER",
+        "sfp_temp_c": "REAL",
+        "sfp_voltage_v": "REAL",
+        "sfp_tx_power_dbm": "REAL",
+        "sfp_rx_power_dbm": "REAL",
+    },
+    "switches": {
+        "lat": "REAL",
+        "lon": "REAL",
+    },
+}
 
 
 def get_conn() -> sqlite3.Connection:
@@ -94,10 +180,22 @@ def get_conn() -> sqlite3.Connection:
     return _conn
 
 
+def _migrate_columns(conn: sqlite3.Connection) -> None:
+    """기존 테이블에 누락된 컬럼을 ALTER로 추가(데이터 보존)."""
+    for table, columns in _COLUMN_MIGRATIONS.items():
+        existing = {
+            r["name"] for r in conn.execute(f"PRAGMA table_info({table})")
+        }
+        for col, decl in columns.items():
+            if col not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+
+
 def init_db() -> None:
     conn = get_conn()
     with _lock:
         conn.executescript(SCHEMA)
+        _migrate_columns(conn)
         conn.commit()
 
 

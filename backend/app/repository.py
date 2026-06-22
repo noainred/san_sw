@@ -133,8 +133,12 @@ def replace_ports(switch_id: int, ports: list[PortInfo]) -> None:
             """
             INSERT INTO ports (switch_id, name, port_index, enabled,
                 operational_status, speed_gbps, max_speed_gbps, port_type,
-                wwn, neighbor_wwn, tx_util_pct, rx_util_pct, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                wwn, neighbor_wwn, tx_util_pct, rx_util_pct,
+                crc_errors, enc_out_errors, link_failures, loss_of_sync,
+                sfp_temp_c, sfp_voltage_v, sfp_tx_power_dbm, sfp_rx_power_dbm,
+                updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
             """,
             [
                 (
@@ -142,6 +146,9 @@ def replace_ports(switch_id: int, ports: list[PortInfo]) -> None:
                     p.operational_status, p.speed_gbps, p.max_speed_gbps,
                     p.port_type, p.wwn, p.neighbor_wwn,
                     p.tx_util_pct, p.rx_util_pct,
+                    p.crc_errors, p.enc_out_errors, p.link_failures,
+                    p.loss_of_sync, p.sfp_temp_c, p.sfp_voltage_v,
+                    p.sfp_tx_power_dbm, p.sfp_rx_power_dbm,
                 )
                 for p in ports
             ],
@@ -203,9 +210,14 @@ def count_switches() -> int:
 # ------------------------------------------------------------ 비밀값 복호화
 
 def decrypted_switch(row: dict[str, Any]) -> dict[str, Any]:
-    """폴링 직전에 password를 복호화한 사본을 만든다(DB/응답엔 암호문 유지)."""
+    """폴링 직전에 password를 평문으로 해석한 사본(로컬 암호화 또는 Vault).
+
+    DB/응답에는 암호문 또는 vault 참조가 그대로 남는다.
+    """
+    from . import secrets  # 지연 import(순환 방지)
+
     out = dict(row)
-    out["password"] = crypto.decrypt(row.get("password"))
+    out["password"] = secrets.resolve_password(row.get("password"))
     return out
 
 
@@ -290,3 +302,202 @@ def get_global_history(limit: int = 120) -> list[dict[str, Any]]:
             "occupancy_pct": round(used / total * 100, 1) if total else 0.0,
         })
     return out
+
+
+# ----------------------------------------------------------------- 지오/지도
+
+def set_switch_geo(switch_id: int, lat: float | None, lon: float | None) -> None:
+    conn = get_conn()
+    with lock():
+        conn.execute(
+            "UPDATE switches SET lat = ?, lon = ? WHERE id = ?",
+            (lat, lon, switch_id),
+        )
+        conn.commit()
+
+
+# --------------------------------------------------------------------- 사용자
+
+def get_user(username: str) -> dict[str, Any] | None:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM users WHERE username = ?", (username,)
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def list_users() -> list[dict[str, Any]]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT id, username, role, created_at FROM users ORDER BY username"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def create_user(username: str, password_hash: str, role: str) -> dict[str, Any]:
+    conn = get_conn()
+    with lock():
+        conn.execute(
+            "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
+            (username, password_hash, role),
+        )
+        conn.commit()
+    return get_user(username)  # type: ignore[return-value]
+
+
+def delete_user(username: str) -> bool:
+    conn = get_conn()
+    with lock():
+        cur = conn.execute("DELETE FROM users WHERE username = ?", (username,))
+        conn.commit()
+    return cur.rowcount > 0
+
+
+def count_users() -> int:
+    conn = get_conn()
+    return conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"]
+
+
+# --------------------------------------------------------------------- 감사
+
+def add_audit(username: str | None, action: str, target: str | None = None,
+              detail: str | None = None) -> None:
+    conn = get_conn()
+    with lock():
+        conn.execute(
+            "INSERT INTO audit_log (username, action, target, detail) "
+            "VALUES (?, ?, ?, ?)",
+            (username, action, target, detail),
+        )
+        conn.commit()
+
+
+def list_audit(limit: int = 200) -> list[dict[str, Any]]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM audit_log ORDER BY id DESC LIMIT ?", (limit,)
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+# ------------------------------------------------------------------ 알림 규칙
+
+def list_alert_rules(enabled_only: bool = False) -> list[dict[str, Any]]:
+    conn = get_conn()
+    sql = "SELECT * FROM alert_rules"
+    if enabled_only:
+        sql += " WHERE enabled = 1"
+    sql += " ORDER BY id"
+    return [dict(r) for r in conn.execute(sql).fetchall()]
+
+
+def create_alert_rule(data: dict[str, Any]) -> dict[str, Any]:
+    conn = get_conn()
+    with lock():
+        cur = conn.execute(
+            """INSERT INTO alert_rules (name, metric, comparator, threshold,
+               severity, enabled) VALUES (?, ?, ?, ?, ?, ?)""",
+            (data["name"], data["metric"], data.get("comparator", ">"),
+             float(data.get("threshold", 0)), data.get("severity", "warning"),
+             1 if data.get("enabled", True) else 0),
+        )
+        conn.commit()
+        rid = cur.lastrowid
+    row = conn.execute("SELECT * FROM alert_rules WHERE id = ?", (rid,)).fetchone()
+    return dict(row)
+
+
+def delete_alert_rule(rule_id: int) -> bool:
+    conn = get_conn()
+    with lock():
+        cur = conn.execute("DELETE FROM alert_rules WHERE id = ?", (rule_id,))
+        conn.commit()
+    return cur.rowcount > 0
+
+
+def add_alert(rule_id: int | None, switch_id: int | None, severity: str,
+              message: str, value: float | None) -> None:
+    conn = get_conn()
+    with lock():
+        conn.execute(
+            """INSERT INTO alerts (rule_id, switch_id, severity, message, value)
+               VALUES (?, ?, ?, ?, ?)""",
+            (rule_id, switch_id, severity, message, value),
+        )
+        conn.commit()
+
+
+def list_alerts(limit: int = 200) -> list[dict[str, Any]]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM alerts ORDER BY id DESC LIMIT ?", (limit,)
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def recent_alert_exists(rule_id: int, switch_id: int | None,
+                        within_seconds: int) -> bool:
+    """동일 규칙·스위치의 최근 알림이 있으면 True(중복 발생 억제)."""
+    conn = get_conn()
+    row = conn.execute(
+        """SELECT 1 FROM alerts
+            WHERE rule_id = ? AND IFNULL(switch_id, -1) = IFNULL(?, -1)
+              AND ts >= datetime('now', ?)
+            LIMIT 1""",
+        (rule_id, switch_id, f"-{int(within_seconds)} seconds"),
+    ).fetchone()
+    return row is not None
+
+
+# -------------------------------------------------------------------- 토폴로지
+
+def replace_isl(switch_id: int, links: list[dict[str, Any]]) -> None:
+    conn = get_conn()
+    with lock():
+        conn.execute("DELETE FROM isl_links WHERE switch_id = ?", (switch_id,))
+        conn.executemany(
+            """INSERT INTO isl_links (switch_id, local_port, remote_wwn,
+               remote_switch_id, speed_gbps) VALUES (?, ?, ?, ?, ?)""",
+            [(switch_id, l.get("local_port"), l.get("remote_wwn"),
+              l.get("remote_switch_id"), l.get("speed_gbps")) for l in links],
+        )
+        conn.commit()
+
+
+def list_isl() -> list[dict[str, Any]]:
+    conn = get_conn()
+    return [dict(r) for r in conn.execute("SELECT * FROM isl_links").fetchall()]
+
+
+# ------------------------------------------------------------------ 구성 백업
+
+def add_config_backup(switch_id: int, filename: str, content: str) -> dict[str, Any]:
+    conn = get_conn()
+    with lock():
+        cur = conn.execute(
+            """INSERT INTO config_backups (switch_id, filename, size, content)
+               VALUES (?, ?, ?, ?)""",
+            (switch_id, filename, len(content), content),
+        )
+        conn.commit()
+        bid = cur.lastrowid
+    row = conn.execute(
+        "SELECT id, switch_id, ts, filename, size FROM config_backups "
+        "WHERE id = ?", (bid,)
+    ).fetchone()
+    return dict(row)
+
+
+def list_config_backups(switch_id: int | None = None) -> list[dict[str, Any]]:
+    conn = get_conn()
+    if switch_id is not None:
+        rows = conn.execute(
+            "SELECT id, switch_id, ts, filename, size FROM config_backups "
+            "WHERE switch_id = ? ORDER BY id DESC", (switch_id,)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT id, switch_id, ts, filename, size FROM config_backups "
+            "ORDER BY id DESC LIMIT 200"
+        ).fetchall()
+    return [dict(r) for r in rows]

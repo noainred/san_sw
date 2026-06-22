@@ -100,6 +100,14 @@ async def poll_all() -> list[dict[str, Any]]:
             out.append({"id": sw["id"], "ok": False, "error": str(res)})
         else:
             out.append(res)
+    # 폴링 직후 알림 규칙 평가(설정에 따라)
+    from .config import ALERT_EVAL_ON_POLL
+    if ALERT_EVAL_ON_POLL:
+        try:
+            from . import alerts
+            await alerts.evaluate_and_notify()
+        except Exception as exc:  # noqa: BLE001 - 알림 실패가 폴링을 막지 않게
+            log.warning("알림 평가 실패: %s", exc)
     return out
 
 

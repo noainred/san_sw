@@ -11,7 +11,20 @@
 - **비밀번호 암호화 저장**(Fernet) — API 응답엔 비노출
 - 웹 UI에 **버전 상시 표시** + **업데이트 확인/자동 업그레이드**
 
-> 현재 버전: `VERSION` 파일 참조 (v0.2.0)
+### v0.3.0 신규 (운영 기능 10종)
+- **포트 에러 카운터**(CRC/enc_out/link_failure/loss_of_sync) 수집·표시 + 경고 하이라이트
+- **SFP DDM**(온도/전압/Tx·Rx 파워) 수집·표시
+- **펌웨어 인벤토리 + EoL 추적**(지원중/임박/경과 분류)
+- **패브릭 토폴로지**(ISL/E_Port 그래프 시각화)
+- **용량 계획 리포트** + **CSV 다운로드**, 사용율 추세
+- **감사 로그**(변경 이력) + **구성 백업**(스냅샷)
+- **임계치 알림**(규칙 평가 + Slack/Webhook 발송)
+- **Prometheus exporter**(`GET /metrics`) + **외부 시크릿(Vault) 연동**
+- **사용자 인증 + RBAC**(admin/operator/viewer, 기본 비활성)
+- **글로벌 지도 대시보드**(데이터센터 위치)
+- 탭 기반 웹 UI(대시보드/지도/토폴로지/펌웨어/알림/리포트/감사)
+
+> 현재 버전: `VERSION` 파일 참조 (v0.3.0)
 >
 > 실장비 연결 방법은 [docs/INTEGRATION.md](docs/INTEGRATION.md) 참고.
 
@@ -88,6 +101,16 @@ python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 | POST | `/api/upgrade/apply` | 업그레이드 적용(허용 시) |
 | GET | `/api/summary` | 전역/리전/DC 집계 |
 | GET | `/api/summary/history` | 전역 포트 사용율 추이(분 버킷) |
+| GET | `/api/firmware` | 펌웨어 인벤토리 + EoL |
+| GET | `/api/topology` | ISL 토폴로지(노드/엣지) |
+| GET | `/api/reports/capacity[.csv]` | 용량 리포트 / CSV |
+| GET/POST/DELETE | `/api/alert-rules` | 알림 규칙 |
+| GET | `/api/alerts` | 발생 알림, `POST /api/alerts/evaluate` 즉시 평가 |
+| GET | `/api/audit` | 감사 로그 |
+| POST/GET | `/api/switches/{id}/backup(s)` | 구성 스냅샷 백업/목록 |
+| POST | `/api/auth/login`, `GET /api/auth/me` | 인증(RBAC) |
+| GET/POST/DELETE | `/api/users` | 사용자 관리(admin) |
+| GET | `/metrics` | Prometheus exposition |
 | GET/POST | `/api/switches` | 스위치 목록/추가 |
 | GET/PUT/DELETE | `/api/switches/{id}` | 상세(포트 포함)/수정/삭제 |
 | GET | `/api/switches/{id}/ports` | 포트 목록+요약 |
@@ -169,15 +192,18 @@ API 흐름(추가→폴링→요약→삭제, 암호화 저장, 히스토리)을
 - [x] 비밀번호 암호화 저장(Fernet)
 - [x] 포트 사용율 추이 차트(전역/스위치별, 시계열 UI)
 
-다음 후보 (추천 기능 10가지):
-1. **임계치 알림** — 포트 사용율/장애/오프라인 임계 초과 시 Slack/Email/Webhook
-2. **사용자 인증 + RBAC** — 관리자/뷰어 권한 분리, 로그인
-3. **포트 에러 카운터 모니터링** — CRC/enc_out/loss_of_sync로 광/SFP 이상 조기 감지
-4. **SFP DDM 진단** — 온도/전압/Tx·Rx 파워 모니터링·임계 경고
-5. **용량 계획 리포트** — 빈 포트 추이·속도별 분포·증설 예측 + CSV/PDF export
-6. **FOS 펌웨어 인벤토리 + EoL/취약점 추적** — 버전 분포·업그레이드 권고
-7. **패브릭 토폴로지 맵** — ISL/E_Port 연결 시각화, Zoning 가시화
-8. **변경 이력/감사 로그 + 구성 백업** — 누가·언제·무엇을, configupload 백업
-9. **글로벌 지도 대시보드** — 데이터센터 위치 기반 현황(멀티 패브릭/멀티 벤더 확장)
-10. **Prometheus exporter + 외부 시크릿(Vault/KMS) 연동** — 관측성/보안 강화
+추천 기능 10가지 (v0.3.0에서 1차 구현 — 데모 검증, 실장비/실서버 I/O 일부 미검증):
+1. [x] **임계치 알림** — 규칙 평가 + Slack/Webhook 발송 (이메일은 추후)
+2. [x] **사용자 인증 + RBAC** — admin/operator/viewer (기본 비활성)
+3. [x] **포트 에러 카운터** — CRC/enc_out/link_failure/loss_of_sync
+4. [x] **SFP DDM 진단** — 온도/전압/Tx·Rx 파워
+5. [x] **용량 계획 리포트** — 속도 분포·DC 롤업·추세 + CSV (PDF는 추후)
+6. [x] **FOS 펌웨어 인벤토리 + EoL** — 분류(EoL 날짜는 검증 필요)
+7. [x] **패브릭 토폴로지 맵** — ISL 그래프 (Zoning은 추후, 데모 링크)
+8. [x] **감사 로그 + 구성 백업** — 변경 이력 + 스냅샷 백업
+9. [x] **글로벌 지도 대시보드** — DC 위치(개략 좌표, 지도 타일 없음)
+10. [x] **Prometheus exporter + Vault 연동** — /metrics + 시크릿 백엔드 추상화
+
+남은 고도화(로드맵): 이메일 알림 · PDF 리포트 · Zoning/실데이터 ISL 매칭 ·
+SNMP v3 · 알림 자동 해소(resolve) · 펌웨어 EoL 자동 동기화 · 읽기 endpoint RBAC.
 ```

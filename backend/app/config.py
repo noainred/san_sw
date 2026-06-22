@@ -49,4 +49,21 @@ SNMP_COMMUNITY = os.environ.get("SANSW_SNMP_COMMUNITY", "public")
 SNMP_PORT = int(os.environ.get("SANSW_SNMP_PORT", "161"))
 SNMP_TIMEOUT = float(os.environ.get("SANSW_SNMP_TIMEOUT", "5"))
 
+# 인증/RBAC. 기본 비활성(기존 동작·테스트 호환). 1이면 보호 활성화.
+AUTH_ENABLED = os.environ.get("SANSW_AUTH_ENABLED", "0") == "1"
+SESSION_TTL = int(os.environ.get("SANSW_SESSION_TTL", "28800"))  # 8h
+# 최초 기동 시 생성할 기본 관리자(인증 활성 + users 비었을 때만).
+BOOTSTRAP_ADMIN_USER = os.environ.get("SANSW_ADMIN_USER", "admin")
+BOOTSTRAP_ADMIN_PASS = os.environ.get("SANSW_ADMIN_PASS", "admin")
+
+# 알림 채널. webhook은 generic JSON 또는 Slack incoming-webhook 모두 호환.
+ALERT_WEBHOOK_URL = os.environ.get("SANSW_ALERT_WEBHOOK_URL")
+ALERT_EVAL_ON_POLL = os.environ.get("SANSW_ALERT_EVAL_ON_POLL", "1") == "1"
+
+# 시크릿 백엔드: local(파일/env) | vault(HashiCorp Vault KV v2)
+SECRET_BACKEND = os.environ.get("SANSW_SECRET_BACKEND", "local").lower()
+VAULT_ADDR = os.environ.get("SANSW_VAULT_ADDR")
+VAULT_TOKEN = os.environ.get("SANSW_VAULT_TOKEN")
+VAULT_KV_PATH = os.environ.get("SANSW_VAULT_KV_PATH", "secret/data/san_sw")
+
 FRONTEND_DIR = BASE_DIR / "frontend"

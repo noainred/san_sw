@@ -38,6 +38,16 @@ class PortInfo:
     # raw octet 카운터(누적). poller가 이전값과의 델타로 사용율을 계산한다.
     tx_octets: int | None = None
     rx_octets: int | None = None
+    # 포트 에러 카운터(누적). 물리계층 이상 조기 감지용.
+    crc_errors: int | None = None
+    enc_out_errors: int | None = None
+    link_failures: int | None = None
+    loss_of_sync: int | None = None
+    # SFP 디지털 진단(DDM). 광 트랜시버 상태.
+    sfp_temp_c: float | None = None
+    sfp_voltage_v: float | None = None
+    sfp_tx_power_dbm: float | None = None
+    sfp_rx_power_dbm: float | None = None
 
     @property
     def is_used(self) -> bool:

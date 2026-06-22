@@ -24,3 +24,26 @@ class SwitchUpdate(BaseModel):
     username: str | None = None
     password: str | None = None
     verify_tls: bool | None = None
+    lat: float | None = None
+    lon: float | None = None
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    role: str = Field("viewer", description="admin | operator | viewer")
+
+
+class AlertRuleCreate(BaseModel):
+    name: str
+    metric: str = Field(..., description="occupancy_pct|error_ports|crc_errors|"
+                                         "sfp_rx_power_dbm|switch_unreachable")
+    comparator: str = Field(">", description="> | < | >= | <= | ==")
+    threshold: float = 0
+    severity: str = Field("warning", description="info|warning|critical")
+    enabled: bool = True

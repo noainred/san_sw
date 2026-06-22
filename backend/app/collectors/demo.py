@@ -45,6 +45,8 @@ class DemoCollector:
         ports: list[PortInfo] = []
         for i in range(port_count):
             roll = base.random()  # 포트별 고정 상태 결정
+            crc = enc = linkf = los = None
+            temp = volt = txp = rxp = None
             if roll < used_ratio:
                 status = "online"
                 speed = base.choice([s for s in (8.0, 16.0, 32.0, 64.0)
@@ -53,6 +55,18 @@ class DemoCollector:
                 tx = round(min(99.0, max(0.0, jitter.gauss(45, 22))), 1)
                 rx = round(min(99.0, max(0.0, jitter.gauss(40, 20))), 1)
                 neighbor = f"20:00:00:25:b5:{i:02x}:{base.randint(0,255):02x}:ab"
+                # 누적 에러 카운터(대부분 0~소량, 일부 포트는 불량으로 급증)
+                bad = base.random() < 0.06  # 약 6% 포트는 에러 다발/광신호 약함
+                crc = jitter.randint(2000, 60000) if bad else jitter.randint(0, 5)
+                enc = jitter.randint(500, 20000) if bad else jitter.randint(0, 3)
+                linkf = jitter.randint(1, 12) if bad else 0
+                los = jitter.randint(1, 8) if bad else 0
+                # SFP DDM (정상범위: temp<70, volt 3.1~3.5, rx -3~-10dBm)
+                temp = round(jitter.gauss(48, 6), 1)
+                volt = round(jitter.gauss(3.3, 0.05), 2)
+                txp = round(jitter.gauss(-2.5, 0.6), 1)
+                rxp = round(jitter.gauss(-13.5, 1.2) if bad
+                            else jitter.gauss(-4.5, 1.2), 1)
             elif roll < used_ratio + 0.05:
                 status = "no_light"  # 케이블만 꽂힘/링크 없음 -> 비어있음 취급
                 speed, ptype, tx, rx, neighbor = None, None, None, None, None
@@ -73,6 +87,14 @@ class DemoCollector:
                     neighbor_wwn=neighbor,
                     tx_util_pct=tx,
                     rx_util_pct=rx,
+                    crc_errors=crc,
+                    enc_out_errors=enc,
+                    link_failures=linkf,
+                    loss_of_sync=los,
+                    sfp_temp_c=temp,
+                    sfp_voltage_v=volt,
+                    sfp_tx_power_dbm=txp,
+                    sfp_rx_power_dbm=rxp,
                 )
             )
 

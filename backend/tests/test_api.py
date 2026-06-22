@@ -61,6 +61,58 @@ def test_password_encrypted_in_db():
         assert "password" not in c.get(f"/api/switches/{sid}").json()
 
 
+def test_metrics_endpoint():
+    with TestClient(app) as c:
+        c.post("/api/switches", json={"ip": "10.1.0.1", "method": "demo"})
+        txt = c.get("/metrics").text
+        assert "sansw_switches_total" in txt
+        assert "sansw_ports_total" in txt
+        assert "sansw_switch_up" in txt
+
+
+def test_firmware_topology_reports():
+    with TestClient(app) as c:
+        c.post("/api/switches", json={"ip": "10.1.0.2", "method": "demo",
+                                      "region": "APAC", "dc": "Z"})
+        fw = c.get("/api/firmware").json()
+        assert "status_counts" in fw and "switches" in fw
+
+        topo = c.get("/api/topology").json()
+        assert "nodes" in topo and "edges" in topo
+
+        rep = c.get("/api/reports/capacity").json()
+        assert "totals" in rep and "speed_distribution" in rep
+        csv = c.get("/api/reports/capacity.csv")
+        assert csv.status_code == 200
+        assert "switch_id" in csv.text
+
+
+def test_alert_rules_and_eval():
+    with TestClient(app) as c:
+        rules = c.get("/api/alert-rules").json()["rules"]
+        assert len(rules) >= 5  # 기본 규칙 시드됨
+        r = c.post("/api/alert-rules", json={
+            "name": "테스트규칙", "metric": "occupancy_pct",
+            "comparator": ">", "threshold": 0, "severity": "info"})
+        assert r.status_code == 201
+        c.post("/api/switches", json={"ip": "10.1.0.3", "method": "demo"})
+        ev = c.post("/api/alerts/evaluate").json()
+        assert "count" in ev
+
+
+def test_auth_disabled_login_and_audit():
+    with TestClient(app) as c:
+        cfg = c.get("/api/auth/config").json()
+        assert cfg["auth_enabled"] is False
+        tok = c.post("/api/auth/login",
+                     json={"username": "x", "password": "y"}).json()
+        assert tok["token"]
+        # 감사 로그: 스위치 생성이 기록되는지
+        c.post("/api/switches", json={"ip": "10.1.0.4", "method": "demo"})
+        audit = c.get("/api/audit").json()["audit"]
+        assert any(a["action"] == "create_switch" for a in audit)
+
+
 def test_history_endpoint_no_inflation():
     with TestClient(app) as c:
         c.post("/api/switches", json={"ip": "10.0.0.88", "method": "demo"})
