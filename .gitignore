@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# 데이터(런타임 생성)
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# 로그/임시
+*.log
+.DS_Store

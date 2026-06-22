@@ -1,0 +1,130 @@
+:root {
+  --bg: #0f1419;
+  --panel: #1a2129;
+  --panel-2: #222c37;
+  --border: #2d3845;
+  --text: #e6edf3;
+  --muted: #8b98a5;
+  --accent: #4f9cf9;
+  --used: #2ea043;
+  --free: #6e7681;
+  --error: #f85149;
+  --warn: #d29922;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 20px; background: var(--panel);
+  border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10;
+}
+.brand { display: flex; align-items: baseline; gap: 8px; }
+.logo { color: var(--accent); font-size: 20px; }
+.title { font-weight: 700; font-size: 18px; }
+.subtitle { color: var(--muted); font-size: 12px; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+
+.version-badge {
+  background: var(--panel-2); color: var(--accent);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 3px 8px; font-family: ui-monospace, monospace; font-size: 12px;
+}
+.update-badge {
+  background: var(--warn); color: #000; border-radius: 6px;
+  padding: 3px 8px; font-size: 12px; font-weight: 600;
+}
+.update-badge a { color: #000; text-decoration: underline; }
+
+.btn {
+  border: 1px solid var(--border); background: var(--panel-2);
+  color: var(--text); border-radius: 6px; padding: 6px 12px;
+  cursor: pointer; font-size: 13px;
+}
+.btn:hover { border-color: var(--accent); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #00111f; font-weight: 600; }
+.btn-ghost { background: transparent; }
+.btn-sm { padding: 3px 8px; font-size: 12px; }
+
+.container { max-width: 1280px; margin: 0 auto; padding: 20px; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 22px; }
+.cards.small { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 12px 0; }
+.card {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px;
+}
+.card .label { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+.card .value { font-size: 26px; font-weight: 700; }
+.card .value .unit { font-size: 14px; color: var(--muted); font-weight: 400; }
+.card.accent .value { color: var(--accent); }
+.card.used .value { color: var(--used); }
+.card.free .value { color: var(--free); }
+.card.error .value { color: var(--error); }
+
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 22px; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.panel-head h2 { margin: 0; font-size: 15px; }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; }
+tbody tr:hover { background: var(--panel-2); }
+td.clickable { color: var(--accent); cursor: pointer; }
+
+.usage-bar { display: inline-flex; align-items: center; gap: 8px; min-width: 120px; }
+.usage-bar .track { flex: 1; height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
+.usage-bar .fill { height: 100%; background: var(--accent); }
+.usage-bar .pct { font-family: ui-monospace, monospace; font-size: 12px; width: 44px; text-align: right; }
+
+.status { padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+.status.online { background: rgba(46,160,67,.15); color: var(--used); }
+.status.unreachable { background: rgba(248,81,73,.15); color: var(--error); }
+.status.unknown { background: rgba(110,118,129,.15); color: var(--muted); }
+
+.muted { color: var(--muted); }
+
+.footer { display: flex; justify-content: space-between; padding: 16px 24px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--border); }
+
+/* 모달 */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.modal.hidden, .hidden { display: none; }
+.modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 22px; width: 440px; max-width: 92vw; }
+.modal-lg { width: 920px; max-height: 88vh; overflow-y: auto; }
+.modal-box h3 { margin-top: 0; }
+.modal-box label { display: block; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+.modal-box input, .modal-box select { width: 100%; margin-top: 4px; padding: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); }
+.modal-box .row { display: flex; gap: 12px; }
+.modal-box .row label { flex: 1; }
+.modal-box label.checkbox { display: flex; align-items: center; gap: 8px; }
+.modal-box label.checkbox input { width: auto; margin: 0; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+.detail-head { display: flex; justify-content: space-between; align-items: center; }
+
+/* 포트 그리드 */
+.legend { display: flex; gap: 16px; align-items: center; color: var(--muted); font-size: 12px; margin: 8px 0 12px; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: middle; }
+.dot.used { background: var(--used); }
+.dot.free { background: var(--free); }
+.dot.error { background: var(--error); }
+
+.port-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; }
+.port {
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px; text-align: center; font-size: 11px;
+  border-left: 4px solid var(--free);
+}
+.port.used { border-left-color: var(--used); }
+.port.error { border-left-color: var(--error); }
+.port .pname { font-weight: 700; font-family: ui-monospace, monospace; }
+.port .pspeed { color: var(--muted); }
+.port .ptype { color: var(--accent); font-size: 10px; }

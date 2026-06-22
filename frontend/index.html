@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>san_sw — Brocade SAN Switch Manager</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◈</span>
+      <span class="title">san_sw</span>
+      <span class="subtitle">Brocade SAN Switch Manager</span>
+    </div>
+    <div class="topbar-right">
+      <span id="version-badge" class="version-badge" title="현재 버전">v—</span>
+      <span id="update-badge" class="update-badge hidden"></span>
+      <button id="btn-check-update" class="btn btn-ghost">업데이트 확인</button>
+      <button id="btn-poll" class="btn btn-primary">전체 폴링</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="cards" id="global-cards"></section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>리전 / 데이터센터별 현황</h2>
+      </div>
+      <div class="table-wrap">
+        <table id="dc-table">
+          <thead>
+            <tr>
+              <th>리전</th><th>데이터센터</th><th>스위치</th>
+              <th>전체 포트</th><th>사용중</th><th>비어있음</th>
+              <th>장애</th><th>포트 사용율</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>스위치 목록</h2>
+        <button id="btn-add" class="btn btn-primary">+ 스위치 추가</button>
+      </div>
+      <div class="table-wrap">
+        <table id="switch-table">
+          <thead>
+            <tr>
+              <th>이름</th><th>IP</th><th>리전/DC</th><th>모델</th>
+              <th>FOS</th><th>상태</th><th>포트(사용/전체)</th>
+              <th>사용율</th><th>수집</th><th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>san_sw <span id="footer-version">v—</span></span>
+    <span class="muted">소규모(SQLite) · FOS REST 우선 · 데모 데이터 포함</span>
+  </footer>
+
+  <!-- 스위치 추가 모달 -->
+  <div id="add-modal" class="modal hidden">
+    <div class="modal-box">
+      <h3>스위치 추가</h3>
+      <form id="add-form">
+        <label>IP / URL <input name="ip" required placeholder="10.0.0.10 또는 https://10.0.0.10" /></label>
+        <label>이름 <input name="name" placeholder="(선택)" /></label>
+        <div class="row">
+          <label>리전 <input name="region" value="global" /></label>
+          <label>데이터센터 <input name="dc" value="default" /></label>
+        </div>
+        <label>수집 방식
+          <select name="method">
+            <option value="fos_rest">FOS REST API</option>
+            <option value="demo">데모(합성 데이터)</option>
+          </select>
+        </label>
+        <div class="row">
+          <label>계정 <input name="username" placeholder="admin" /></label>
+          <label>비밀번호 <input name="password" type="password" /></label>
+        </div>
+        <label class="checkbox">
+          <input type="checkbox" name="verify_tls" /> TLS 인증서 검증(자체서명이면 끔)
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="add-cancel">취소</button>
+          <button type="submit" class="btn btn-primary">추가</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 스위치 상세 모달 -->
+  <div id="detail-modal" class="modal hidden">
+    <div class="modal-box modal-lg">
+      <div class="detail-head">
+        <h3 id="detail-title">스위치 상세</h3>
+        <button class="btn btn-ghost" id="detail-close">닫기</button>
+      </div>
+      <div id="detail-summary" class="cards small"></div>
+      <div class="legend">
+        <span class="dot used"></span> 사용중
+        <span class="dot free"></span> 비어있음
+        <span class="dot error"></span> 장애
+      </div>
+      <div id="port-grid" class="port-grid"></div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

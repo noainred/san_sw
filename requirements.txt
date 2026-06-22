@@ -1,0 +1,5 @@
+# san_sw 런타임 의존성 (Python 3.10+)
+fastapi>=0.110
+uvicorn[standard]>=0.27
+httpx>=0.27
+# 표준 라이브러리 사용: sqlite3, asyncio (별도 설치 불필요)
