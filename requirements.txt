@@ -2,4 +2,10 @@
 fastapi>=0.110
 uvicorn[standard]>=0.27
 httpx>=0.27
+cryptography>=42        # 비밀번호 암호화 저장(Fernet)
+
+# 선택 의존성: SNMP 수집기를 쓸 때만 필요.
+# 미설치 시 SNMP 스위치 폴링만 비활성화되고 앱은 정상 동작한다.
+pysnmp>=6.2 ; python_version >= "3.8"
+
 # 표준 라이브러리 사용: sqlite3, asyncio (별도 설치 불필요)

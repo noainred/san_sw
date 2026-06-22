@@ -31,6 +31,60 @@ function card(label, value, unit, cls) {
   </div>`;
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+// 의존성 없는 SVG 라인 차트. values: [{x:label, y:number(0~100)}], 단위 %.
+function drawLineChart(svg, emptyEl, values) {
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const vb = svg.viewBox.baseVal;
+  const W = vb.width, H = vb.height;
+  const pad = { l: 34, r: 8, t: 10, b: 18 };
+  const ok = values && values.length >= 2;
+  if (emptyEl) emptyEl.style.display = ok ? "none" : "block";
+  svg.style.display = ok ? "block" : "none";
+  if (!ok) return;
+
+  const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
+  const n = values.length;
+  const xAt = (i) => pad.l + (n === 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+  const yAt = (v) => pad.t + innerH - (Math.max(0, Math.min(100, v)) / 100) * innerH;
+
+  // y축 그리드 (0/50/100%)
+  [0, 50, 100].forEach((g) => {
+    const y = yAt(g);
+    const line = document.createElementNS(SVG_NS, "line");
+    line.setAttribute("x1", pad.l); line.setAttribute("x2", W - pad.r);
+    line.setAttribute("y1", y); line.setAttribute("y2", y);
+    line.setAttribute("stroke", "#2d3845"); line.setAttribute("stroke-width", "1");
+    svg.appendChild(line);
+    const t = document.createElementNS(SVG_NS, "text");
+    t.setAttribute("x", 4); t.setAttribute("y", y + 3);
+    t.setAttribute("fill", "#8b98a5"); t.setAttribute("font-size", "10");
+    t.textContent = g + "%";
+    svg.appendChild(t);
+  });
+
+  const pts = values.map((d, i) => `${xAt(i)},${yAt(d.y)}`).join(" ");
+  // 면적
+  const area = document.createElementNS(SVG_NS, "polygon");
+  area.setAttribute("points", `${pad.l},${yAt(0)} ${pts} ${xAt(n - 1)},${yAt(0)}`);
+  area.setAttribute("fill", "rgba(79,156,249,0.12)");
+  svg.appendChild(area);
+  // 선
+  const line = document.createElementNS(SVG_NS, "polyline");
+  line.setAttribute("points", pts);
+  line.setAttribute("fill", "none");
+  line.setAttribute("stroke", "#4f9cf9");
+  line.setAttribute("stroke-width", "2");
+  svg.appendChild(line);
+  // 마지막 값 점
+  const last = values[n - 1];
+  const dot = document.createElementNS(SVG_NS, "circle");
+  dot.setAttribute("cx", xAt(n - 1)); dot.setAttribute("cy", yAt(last.y));
+  dot.setAttribute("r", "3"); dot.setAttribute("fill", "#4f9cf9");
+  svg.appendChild(dot);
+}
+
 // ---------------------------------------------------------------- 버전
 
 async function loadVersion() {
@@ -78,6 +132,8 @@ async function loadSummary() {
     card("포트 사용율", g.occupancy_pct, "%", "accent"),
   ].join("");
 
+  await loadGlobalHistory();
+
   const tbody = $("#dc-table tbody");
   tbody.innerHTML = s.datacenters.map((d) => {
     const m = d.summary;
@@ -90,6 +146,22 @@ async function loadSummary() {
       <td>${pctBar(m.occupancy_pct)}</td>
     </tr>`;
   }).join("") || `<tr><td colspan="8" class="muted">데이터센터 없음</td></tr>`;
+}
+
+async function loadGlobalHistory() {
+  try {
+    const r = await api("/api/summary/history?limit=120");
+    const pts = (r.history || []).map((h) => ({ x: h.ts, y: h.occupancy_pct }));
+    drawLineChart($("#global-chart"), $("#global-chart-empty"), pts);
+    const range = $("#global-chart-range");
+    if (range && pts.length >= 2) {
+      range.textContent = `${pts[0].x} ~ ${pts[pts.length - 1].x} (${pts.length}p)`;
+    } else if (range) {
+      range.textContent = "";
+    }
+  } catch (e) {
+    drawLineChart($("#global-chart"), $("#global-chart-empty"), []);
+  }
 }
 
 // ---------------------------------------------------------------- 스위치 목록
@@ -152,6 +224,15 @@ async function openDetail(id) {
     card("평균 대역폭", m.avg_util_pct == null ? "—" : m.avg_util_pct,
          m.avg_util_pct == null ? "" : "%"),
   ].join("");
+
+  // 사용율 추이 차트
+  try {
+    const sres = await api(`/api/switches/${id}/samples?limit=120`);
+    const pts = (sres.samples || []).map((s) => ({ x: s.ts, y: s.occupancy_pct }));
+    drawLineChart($("#detail-chart"), $("#detail-chart-empty"), pts);
+  } catch (e) {
+    drawLineChart($("#detail-chart"), $("#detail-chart-empty"), []);
+  }
 
   $("#port-grid").innerHTML = (sw.ports || []).map((p) => {
     const cls = p.operational_status === "online" || p.operational_status === "in_sync"

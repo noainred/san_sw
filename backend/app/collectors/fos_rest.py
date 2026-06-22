@@ -10,9 +10,10 @@
 
 정직성 메모:
 - operational-status(정수)와 속도/포트타입/WWN은 REST에서 안정적으로 얻는다.
-- 대역폭 사용율(tx/rx %)은 REST의 octet 카운터 필드 명세가 펌웨어별로 달라
-  실측 검증 전까지 None으로 둔다(추측값을 넣지 않는다). 데모 수집기에서만
-  사용율을 합성한다. -> 향후 버전에서 카운터 델타 기반으로 구현 예정.
+- 대역폭 사용율(tx/rx %)은 fibrechannel-statistics의 octet 카운터를 읽어
+  poller가 델타 기반으로 계산한다(2회차 폴링부터 값이 생김). 단, octet 필드명은
+  펌웨어별로 다를 수 있어 여러 후보명을 시도하며, 없으면 빈 값으로 둔다
+  (추측값을 넣지 않는다). 실장비 미검증 — docs/INTEGRATION.md 참고.
 """
 from __future__ import annotations
 
@@ -74,6 +75,11 @@ class FOSRestCollector(BaseCollector):
                     name, fw = await self._switch_info(client, auth)
                     model = await self._chassis_model(client, auth)
                     ports = await self._ports(client, auth)
+                    stats = await self._statistics(client, auth)
+                    for p in ports:
+                        oct_pair = stats.get(p.name)
+                        if oct_pair:
+                            p.tx_octets, p.rx_octets = oct_pair
                 finally:
                     await self._logout(client, auth)
             return SwitchSnapshot(
@@ -145,6 +151,53 @@ class FOSRestCollector(BaseCollector):
             return None
         return ch[0].get("product-name") or ch[0].get("vendor-part-number")
 
+    # statistics 응답의 octet 카운터 후보 필드명(펌웨어별 상이 가능).
+    # tx=송신=out, rx=수신=in.
+    _TX_OCTET_FIELDS = ("out-octets", "out-bytes", "stat-tx-octets", "tx-octets")
+    _RX_OCTET_FIELDS = ("in-octets", "in-bytes", "stat-rx-octets", "rx-octets")
+
+    @staticmethod
+    def _pick_octets(rec: dict, fields: tuple[str, ...]) -> int | None:
+        for f in fields:
+            if rec.get(f) is not None:
+                try:
+                    return int(rec[f])
+                except (TypeError, ValueError):
+                    return None
+        return None
+
+    async def _statistics(
+        self, client: httpx.AsyncClient, auth: dict
+    ) -> dict[str, tuple[int | None, int | None]]:
+        """포트별 (tx_octets, rx_octets). 필드가 없거나 실패하면 빈 dict.
+
+        대역폭 사용율은 poller가 이 카운터의 델타로 계산한다. octet 필드가
+        없는 펌웨어에서는 사용율이 빈 값으로 남는다(추측값 미삽입).
+        """
+        url = (
+            f"{self.base}/rest/running/brocade-interface/"
+            "fibrechannel-statistics"
+        )
+        try:
+            resp = await client.get(url, headers=auth)
+            resp.raise_for_status()
+        except httpx.HTTPError:
+            return {}
+        try:
+            body = resp.json().get("Response", {})
+        except ValueError:
+            return {}
+        out: dict[str, tuple[int | None, int | None]] = {}
+        for rec in _as_list(body.get("fibrechannel-statistics")):
+            name = rec.get("name")
+            if not name:
+                continue
+            out[name] = (
+                self._pick_octets(rec, self._TX_OCTET_FIELDS),
+                self._pick_octets(rec, self._RX_OCTET_FIELDS),
+            )
+        return out
+
     async def _ports(
         self, client: httpx.AsyncClient, auth: dict
     ) -> list[PortInfo]:
@@ -185,7 +238,8 @@ class FOSRestCollector(BaseCollector):
                     port_type=ptype,
                     wwn=fc.get("wwn"),
                     neighbor_wwn=neighbor_wwn,
-                    tx_util_pct=None,  # REST 실측 미구현(정직)
+                    # 사용율은 poller가 octet 카운터 델타로 계산(2회차 폴링부터).
+                    tx_util_pct=None,
                     rx_util_pct=None,
                 )
             )

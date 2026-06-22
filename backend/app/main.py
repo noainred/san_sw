@@ -139,6 +139,13 @@ async def api_summary() -> dict[str, Any]:
     }
 
 
+@app.get("/api/summary/history")
+async def api_summary_history(limit: int = 120) -> dict[str, Any]:
+    """전역 포트 사용율 추이(분 단위 버킷)."""
+    history = await asyncio.to_thread(repo.get_global_history, limit)
+    return {"history": history}
+
+
 # --------------------------------------------------------------------- 스위치
 
 @app.get("/api/switches")

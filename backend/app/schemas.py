@@ -9,7 +9,7 @@ class SwitchCreate(BaseModel):
     name: str | None = None
     dc: str = "default"
     region: str = "global"
-    method: str = Field("fos_rest", description="fos_rest | demo")
+    method: str = Field("fos_rest", description="fos_rest | snmp | demo")
     username: str | None = None
     password: str | None = None
     verify_tls: bool = False

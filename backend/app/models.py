@@ -35,6 +35,9 @@ class PortInfo:
     neighbor_wwn: str | None = None
     tx_util_pct: float | None = None  # 송신 대역폭 사용율(%)
     rx_util_pct: float | None = None  # 수신 대역폭 사용율(%)
+    # raw octet 카운터(누적). poller가 이전값과의 델타로 사용율을 계산한다.
+    tx_octets: int | None = None
+    rx_octets: int | None = None
 
     @property
     def is_used(self) -> bool:

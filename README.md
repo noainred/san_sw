@@ -4,10 +4,16 @@
 
 - 리전/데이터센터별 **포트 사용율, 사용중 포트 수, 비어있는(미사용) 포트 수** 집계
 - 포트별 **상태/속도/포트타입/WWN** 조회
+- **대역폭 사용율(tx/rx %)** — octet 카운터 델타 기반(REST/SNMP), 2회차 폴링부터
+- **전역/스위치별 포트 사용율 추이 차트**(무의존 SVG, 시계열)
+- **수집 방식 3종**: FOS REST API · SNMP(v2c) · 데모(합성)
 - 스위치 등록·삭제·즉시 폴링, 주기 폴링(백그라운드)
+- **비밀번호 암호화 저장**(Fernet) — API 응답엔 비노출
 - 웹 UI에 **버전 상시 표시** + **업데이트 확인/자동 업그레이드**
 
-> 현재 버전: `VERSION` 파일 참조 (v0.1.0)
+> 현재 버전: `VERSION` 파일 참조 (v0.2.0)
+>
+> 실장비 연결 방법은 [docs/INTEGRATION.md](docs/INTEGRATION.md) 참고.
 
 ---
 
@@ -18,9 +24,12 @@
   실환경 적용 시 펌웨어 버전(FOS 8.2+/9.x)에 따라 필드명 보정이 필요할 수 있습니다.
 - UI/집계 로직 검증을 위해 **데모 수집기(method=demo)** 가 합성 데이터를 만듭니다.
   데모 값은 실제 측정값이 아닙니다.
-- **대역폭 사용율(tx/rx %)** 은 데모에서만 제공합니다. REST 실측(octet 카운터
-  델타 기반)은 펌웨어별 필드 확인이 필요해 v0.1에서는 비워둡니다(None). 추측값을
-  넣지 않습니다. → 로드맵 참고.
+- **대역폭 사용율(tx/rx %)** 은 REST/SNMP의 octet 카운터 델타로 계산합니다(순수
+  계산 로직은 단위테스트됨). 다만 **실장비 네트워크 I/O는 미검증**이며, octet
+  필드명/OID는 펌웨어별로 보정이 필요할 수 있습니다(docs/INTEGRATION.md).
+  카운터가 없으면 추측값 대신 빈 값으로 둡니다.
+- **SNMP 수집기**는 `pysnmp`(선택 의존성)가 있을 때만 동작하며, IF-MIB 표준
+  OID를 사용합니다. 실 에이전트 대상 검증은 미수행.
 
 ---
 
@@ -78,6 +87,7 @@ python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 | GET | `/api/upgrade/check` | GitHub 최신 릴리스와 비교 |
 | POST | `/api/upgrade/apply` | 업그레이드 적용(허용 시) |
 | GET | `/api/summary` | 전역/리전/DC 집계 |
+| GET | `/api/summary/history` | 전역 포트 사용율 추이(분 버킷) |
 | GET/POST | `/api/switches` | 스위치 목록/추가 |
 | GET/PUT/DELETE | `/api/switches/{id}` | 상세(포트 포함)/수정/삭제 |
 | GET | `/api/switches/{id}/ports` | 포트 목록+요약 |
@@ -95,21 +105,25 @@ backend/app/
   config.py        환경변수 설정
   version.py       버전 단일출처(VERSION) + GitHub 릴리스 비교
   db.py            SQLite 연결/스키마
-  repository.py    스위치/포트/샘플 CRUD
+  repository.py    스위치/포트/샘플/카운터 CRUD, 전역 히스토리
   models.py        도메인 모델(PortInfo/SwitchSnapshot)
   stats.py         포트 사용율/집계 계산
-  poller.py        백그라운드/수동 폴링
+  util_calc.py     대역폭 사용율(카운터 델타) 순수 계산
+  crypto.py        비밀번호 암호화(Fernet)
+  poller.py        백그라운드/수동 폴링 + 카운터 기반 사용율 산출
   upgrade.py       업그레이드 적용(scripts/upgrade.sh 실행)
   collectors/
     base.py        수집기 추상화
     fos_rest.py    FOS REST API 수집기(실장비 대상)
+    snmp.py        SNMP(v2c) 수집기(IF-MIB, pysnmp lazy import)
     demo.py        데모 합성 데이터
-frontend/          정적 대시보드(HTML/CSS/Vanilla JS)
+frontend/          정적 대시보드(HTML/CSS/Vanilla JS, 무의존 SVG 차트)
+docs/INTEGRATION.md 실장비(REST/SNMP) 연동 가이드
 scripts/upgrade.sh 업그레이드 스크립트
 ```
 
-수집 방식은 `collectors`로 추상화되어 있어 추후 SNMP/SSH 수집기를 같은
-인터페이스로 추가할 수 있습니다.
+수집 방식은 `collectors`로 추상화되어 있어 REST/SNMP/데모를 같은
+인터페이스로 사용하며, 추후 SSH 수집기도 동일하게 추가할 수 있습니다.
 
 ---
 
@@ -123,11 +137,14 @@ scripts/upgrade.sh 업그레이드 스크립트
 
 ## 보안 주의 (알려진 한계)
 
-- 스위치 계정 비밀번호가 **SQLite에 평문 저장**됩니다(v0.1). API 응답에는
-  비밀번호를 노출하지 않지만, DB 파일 접근 통제가 필요합니다. → 로드맵에서
-  비밀 암호화/외부 시크릿 연동 예정.
+- 스위치 계정 비밀번호는 **Fernet 대칭키로 암호화**해 SQLite에 저장합니다
+  (`enc:` 접두어). API 응답에도 비노출. 단, 암호화 키(`data/secret.key` 또는
+  `SANSW_SECRET_KEY`)와 DB가 같은 호스트에 있으면 둘 다 접근 가능한 공격자는
+  복호화할 수 있습니다. 완전한 비밀 보호는 외부 시크릿 매니저(Vault/KMS) 연동이
+  필요합니다(로드맵).
 - FOS REST는 자체서명 인증서가 흔해 기본 `verify_tls=False`입니다. 사내 CA가
   있으면 켜세요.
+- SNMP는 현재 v2c(community)만 지원합니다. v3(인증/암호화)는 추후.
 
 ---
 
@@ -139,15 +156,28 @@ pip install pytest
 python -m pytest
 ```
 
-집계 로직(stats), 데모 수집기, API 흐름(추가→폴링→요약→삭제)을 검증합니다.
+집계 로직(stats), 대역폭 계산(util_calc), 암호화(crypto), 데모/SNMP 수집기,
+API 흐름(추가→폴링→요약→삭제, 암호화 저장, 히스토리)을 검증합니다(25건).
 
 ---
 
-## 로드맵
+## 로드맵 / 완료 현황
 
-- [ ] FOS REST 대역폭 사용율 실측(octet 카운터 델타) + 실장비 검증
-- [ ] SNMP / SSH 수집기 추가
-- [ ] 비밀번호 암호화 저장 / 외부 시크릿 연동
-- [ ] 사용율 추이 차트(시계열 UI)
-- [ ] 알림(임계치 초과) / 사용자 인증
+완료 (v0.2.0):
+- [x] FOS REST 대역폭 사용율(octet 카운터 델타) 계산 로직 — *실장비 I/O 미검증*
+- [x] SNMP(v2c) 수집기(IF-MIB) — *실 에이전트 미검증*
+- [x] 비밀번호 암호화 저장(Fernet)
+- [x] 포트 사용율 추이 차트(전역/스위치별, 시계열 UI)
+
+다음 후보 (추천 기능 10가지):
+1. **임계치 알림** — 포트 사용율/장애/오프라인 임계 초과 시 Slack/Email/Webhook
+2. **사용자 인증 + RBAC** — 관리자/뷰어 권한 분리, 로그인
+3. **포트 에러 카운터 모니터링** — CRC/enc_out/loss_of_sync로 광/SFP 이상 조기 감지
+4. **SFP DDM 진단** — 온도/전압/Tx·Rx 파워 모니터링·임계 경고
+5. **용량 계획 리포트** — 빈 포트 추이·속도별 분포·증설 예측 + CSV/PDF export
+6. **FOS 펌웨어 인벤토리 + EoL/취약점 추적** — 버전 분포·업그레이드 권고
+7. **패브릭 토폴로지 맵** — ISL/E_Port 연결 시각화, Zoning 가시화
+8. **변경 이력/감사 로그 + 구성 백업** — 누가·언제·무엇을, configupload 백업
+9. **글로벌 지도 대시보드** — 데이터센터 위치 기반 현황(멀티 패브릭/멀티 벤더 확장)
+10. **Prometheus exporter + 외부 시크릿(Vault/KMS) 연동** — 관측성/보안 강화
 ```

@@ -36,4 +36,17 @@ ALLOW_UPGRADE_APPLY = os.environ.get("SANSW_ALLOW_UPGRADE_APPLY", "0") == "1"
 # 실제 운영 시 "0"으로 끈다.
 SEED_DEMO = os.environ.get("SANSW_SEED_DEMO", "1") == "1"
 
+# 비밀번호 암호화 키.
+# - SANSW_SECRET_KEY 가 있으면 그것을 사용(Fernet 키이거나 임의 문자열→파생).
+# - 없으면 data/secret.key 에 자동 생성(권한 0600).
+SECRET_KEY = os.environ.get("SANSW_SECRET_KEY")
+SECRET_KEY_FILE = Path(
+    os.environ.get("SANSW_SECRET_KEY_FILE", str(DATA_DIR / "secret.key"))
+)
+
+# SNMP 기본값(스위치별로 community/port를 username 칸 등에 따로 둘 수도 있음)
+SNMP_COMMUNITY = os.environ.get("SANSW_SNMP_COMMUNITY", "public")
+SNMP_PORT = int(os.environ.get("SANSW_SNMP_PORT", "161"))
+SNMP_TIMEOUT = float(os.environ.get("SANSW_SNMP_TIMEOUT", "5"))
+
 FRONTEND_DIR = BASE_DIR / "frontend"

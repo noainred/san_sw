@@ -93,6 +93,13 @@ td.clickable { color: var(--accent); cursor: pointer; }
 
 .muted { color: var(--muted); }
 
+/* 차트 */
+.chart-wrap { padding: 14px 16px; position: relative; }
+.chart-wrap.small { padding: 6px 0 2px; }
+.chart { width: 100%; height: 200px; display: block; }
+.chart-wrap.small .chart { height: 150px; }
+.chart-empty { padding: 28px 0; text-align: center; }
+
 .footer { display: flex; justify-content: space-between; padding: 16px 24px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--border); }
 
 /* 모달 */

@@ -64,6 +64,16 @@ CREATE TABLE IF NOT EXISTS samples (
     avg_util_pct  REAL
 );
 
+-- 포트별 직전 octet 카운터(대역폭 사용율 델타 계산용). 포트당 1행 upsert.
+CREATE TABLE IF NOT EXISTS port_counters (
+    switch_id  INTEGER NOT NULL REFERENCES switches(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL,
+    tx_octets  INTEGER,
+    rx_octets  INTEGER,
+    ts         REAL NOT NULL,            -- unix epoch(초)
+    PRIMARY KEY (switch_id, name)
+);
+
 CREATE INDEX IF NOT EXISTS idx_ports_switch ON ports(switch_id);
 CREATE INDEX IF NOT EXISTS idx_samples_switch_ts ON samples(switch_id, ts);
 """

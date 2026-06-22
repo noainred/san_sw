@@ -26,6 +26,20 @@
 
     <section class="panel">
       <div class="panel-head">
+        <h2>전역 포트 사용율 추이</h2>
+        <span class="muted" id="global-chart-range"></span>
+      </div>
+      <div class="chart-wrap">
+        <svg id="global-chart" class="chart" viewBox="0 0 800 200"
+             preserveAspectRatio="none"></svg>
+        <div id="global-chart-empty" class="chart-empty muted">
+          데이터 누적 중… 폴링이 쌓이면 추이가 그려집니다.
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
         <h2>리전 / 데이터센터별 현황</h2>
       </div>
       <div class="table-wrap">
@@ -81,6 +95,7 @@
         <label>수집 방식
           <select name="method">
             <option value="fos_rest">FOS REST API</option>
+            <option value="snmp">SNMP (v2c · 계정칸=community)</option>
             <option value="demo">데모(합성 데이터)</option>
           </select>
         </label>
@@ -107,6 +122,13 @@
         <button class="btn btn-ghost" id="detail-close">닫기</button>
       </div>
       <div id="detail-summary" class="cards small"></div>
+      <div class="chart-wrap small">
+        <svg id="detail-chart" class="chart" viewBox="0 0 800 160"
+             preserveAspectRatio="none"></svg>
+        <div id="detail-chart-empty" class="chart-empty muted">
+          추이 데이터 없음 — 폴링이 누적되면 표시됩니다.
+        </div>
+      </div>
       <div class="legend">
         <span class="dot used"></span> 사용중
         <span class="dot free"></span> 비어있음
