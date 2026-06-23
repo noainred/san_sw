@@ -1,0 +1,32 @@
+# san_sw docker-compose
+#   cd deploy && docker compose up -d --build
+# 데이터는 명명 볼륨(sansw-data)에 영속화됩니다.
+services:
+  sansw:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: san_sw:latest
+    container_name: san_sw
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      SANSW_DATA_DIR: /app/data
+      # --- 운영 권장 설정(주석 해제) ---
+      # SANSW_SEED_DEMO: "0"            # 데모 스위치 자동시드 끄기
+      # SANSW_AUTH_ENABLED: "1"        # 인증/RBAC 켜기
+      # SANSW_ADMIN_USER: "admin"
+      # SANSW_ADMIN_PASS: "change-me"
+      # SANSW_SECRET_KEY: "set-a-long-random-string"
+      # SANSW_POLL_INTERVAL: "60"
+      # SANSW_ALERT_WEBHOOK_URL: "https://hooks.slack.com/services/XXX"
+    # .env 파일로 설정하려면 주석 해제(파일 없으면 무시):
+    # env_file:
+    #   - path: ../.env
+    #     required: false
+    volumes:
+      - sansw-data:/app/data
+
+volumes:
+  sansw-data:

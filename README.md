@@ -76,6 +76,22 @@ python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 
 실제 운영 시 데모 시드 끄기: `SANSW_SEED_DEMO=0`
 
+### 서비스로 실행(systemd / Docker)
+
+상시 서비스 배포는 [docs/DEPLOY.md](docs/DEPLOY.md) 참고. 빠른 요약:
+
+```bash
+# systemd (권장) — /opt/san_sw 에 설치 + 서비스 등록/기동
+sudo bash deploy/install.sh
+systemctl status san_sw
+
+# 또는 docker-compose
+cd deploy && docker compose up -d --build
+```
+
+배포 파일: `deploy/san_sw.service`, `deploy/install.sh`, `deploy/Dockerfile`,
+`deploy/docker-compose.yml`, 환경변수 예시 `.env.example`.
+
 ---
 
 ## 설정 (환경변수)

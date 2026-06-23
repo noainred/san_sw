@@ -16,3 +16,7 @@ data/
 # 로그/임시
 *.log
 .DS_Store
+
+# 환경설정(비밀 포함 가능) — 예시(.env.example)만 커밋
+.env
+deploy/.env
