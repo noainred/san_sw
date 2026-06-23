@@ -1,0 +1,35 @@
+[Unit]
+Description=san_sw — Brocade SAN Switch Manager
+Documentation=https://github.com/noainred/san_sw
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# 전용 시스템 계정 권장(install.sh가 생성). 다른 계정을 쓰면 수정하세요.
+User=sansw
+Group=sansw
+
+# 설치 경로(install.sh 기본값). 다르면 수정하세요.
+WorkingDirectory=/opt/san_sw
+
+# 환경변수 파일(없어도 무방). 비밀키/포트/인증 등은 여기서 설정.
+EnvironmentFile=-/opt/san_sw/.env
+
+# 데이터(SQLite/secret.key)는 WorkingDirectory/data 에 저장됨.
+ExecStart=/opt/san_sw/.venv/bin/python -m uvicorn backend.app.main:app \
+    --host 0.0.0.0 --port 8000
+
+# 자동 재시작(자동 업그레이드 후 새 코드 반영에도 사용).
+Restart=always
+RestartSec=3
+
+# 보안 강화(선택)
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/san_sw/data
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>san_sw — Brocade SAN Switch Manager</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◈</span>
+      <span class="title">san_sw</span>
+      <span class="subtitle">Brocade SAN Switch Manager</span>
+    </div>
+    <div class="topbar-right">
+      <span id="version-badge" class="version-badge" title="현재 버전">v—</span>
+      <span id="update-badge" class="update-badge hidden"></span>
+      <span id="user-badge" class="muted"></span>
+      <button id="btn-login" class="btn btn-ghost hidden">로그인</button>
+      <button id="btn-check-update" class="btn btn-ghost">업데이트 확인</button>
+      <button id="btn-poll" class="btn btn-primary">전체 폴링</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="dashboard">대시보드</button>
+    <button class="tab" data-tab="map">지도</button>
+    <button class="tab" data-tab="topology">토폴로지</button>
+    <button class="tab" data-tab="firmware">펌웨어/EoL</button>
+    <button class="tab" data-tab="alerts">알림</button>
+    <button class="tab" data-tab="reports">리포트</button>
+    <button class="tab" data-tab="audit">감사로그</button>
+  </nav>
+
+  <main class="container">
+    <!-- 대시보드 -->
+    <section class="tab-section active" id="tab-dashboard">
+      <section class="cards" id="global-cards"></section>
+      <section class="panel">
+        <div class="panel-head"><h2>전역 포트 사용율 추이</h2>
+          <span class="muted" id="global-chart-range"></span></div>
+        <div class="chart-wrap">
+          <svg id="global-chart" class="chart" viewBox="0 0 800 200"
+               preserveAspectRatio="none"></svg>
+          <div id="global-chart-empty" class="chart-empty muted">
+            데이터 누적 중…</div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>리전 / 데이터센터별 현황</h2></div>
+        <div class="table-wrap">
+          <table id="dc-table">
+            <thead><tr>
+              <th>리전</th><th>데이터센터</th><th>스위치</th><th>전체 포트</th>
+              <th>사용중</th><th>비어있음</th><th>장애</th><th>포트 사용율</th>
+            </tr></thead><tbody></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>스위치 목록</h2>
+          <button id="btn-add" class="btn btn-primary">+ 스위치 추가</button></div>
+        <div class="table-wrap">
+          <table id="switch-table">
+            <thead><tr>
+              <th>이름</th><th>IP</th><th>리전/DC</th><th>모델</th><th>FOS</th>
+              <th>상태</th><th>포트(사용/전체)</th><th>사용율</th><th>수집</th><th></th>
+            </tr></thead><tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <!-- 지도 -->
+    <section class="tab-section" id="tab-map">
+      <div class="panel">
+        <div class="panel-head"><h2>글로벌 데이터센터 현황</h2>
+          <span class="muted">개략 위치(지도 타일 없음) · 점 크기=포트수, 색=상태</span></div>
+        <div class="map-wrap">
+          <svg id="world-map" viewBox="0 0 1000 500"></svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- 토폴로지 -->
+    <section class="tab-section" id="tab-topology">
+      <div class="panel">
+        <div class="panel-head"><h2>패브릭 토폴로지 (ISL/E_Port)</h2>
+          <span class="muted">노드=스위치, 선=ISL</span></div>
+        <div class="topo-wrap"><svg id="topo-svg" viewBox="0 0 800 500"></svg></div>
+      </div>
+    </section>
+
+    <!-- 펌웨어 -->
+    <section class="tab-section" id="tab-firmware">
+      <section class="cards small" id="fw-cards"></section>
+      <div class="panel">
+        <div class="panel-head"><h2>FOS 펌웨어 인벤토리 / EoL</h2>
+          <span class="muted" id="fw-note"></span></div>
+        <div class="table-wrap">
+          <table id="fw-table"><thead><tr>
+            <th>스위치</th><th>리전/DC</th><th>FOS</th><th>EoL</th>
+            <th>남은일수</th><th>상태</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 알림 -->
+    <section class="tab-section" id="tab-alerts">
+      <div class="panel">
+        <div class="panel-head"><h2>알림 규칙</h2>
+          <button id="btn-add-rule" class="btn btn-primary">+ 규칙 추가</button></div>
+        <div class="table-wrap"><table id="rules-table"><thead><tr>
+          <th>이름</th><th>지표</th><th>조건</th><th>심각도</th><th>사용</th><th></th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>발생 알림</h2>
+          <button id="btn-eval" class="btn btn-ghost">지금 평가</button></div>
+        <div class="table-wrap"><table id="alerts-table"><thead><tr>
+          <th>시각</th><th>심각도</th><th>메시지</th><th>값</th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- 리포트 -->
+    <section class="tab-section" id="tab-reports">
+      <section class="cards small" id="rep-cards"></section>
+      <div class="panel">
+        <div class="panel-head"><h2>용량 계획</h2>
+          <a class="btn btn-ghost" href="/api/reports/capacity.csv">CSV 내려받기</a></div>
+        <div class="rep-body">
+          <div id="rep-trend" class="muted"></div>
+          <h3>속도 분포</h3>
+          <div id="rep-speed" class="chips"></div>
+          <h3>데이터센터별</h3>
+          <div class="table-wrap"><table id="rep-dc"><thead><tr>
+            <th>리전</th><th>DC</th><th>전체</th><th>사용중</th><th>여유</th><th>사용율</th>
+          </tr></thead><tbody></tbody></table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 감사 -->
+    <section class="tab-section" id="tab-audit">
+      <div class="panel">
+        <div class="panel-head"><h2>감사 로그</h2></div>
+        <div class="table-wrap"><table id="audit-table"><thead><tr>
+          <th>시각</th><th>사용자</th><th>동작</th><th>대상</th><th>상세</th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>san_sw <span id="footer-version">v—</span></span>
+    <span class="muted">FOS REST·SNMP·데모 · 대역폭·에러·DDM·토폴로지·알림 · /metrics</span>
+  </footer>
+
+  <!-- 스위치 추가 모달 -->
+  <div id="add-modal" class="modal hidden"><div class="modal-box">
+    <h3>스위치 추가</h3>
+    <form id="add-form">
+      <label>IP / URL <input name="ip" required placeholder="10.0.0.10 또는 https://10.0.0.10" /></label>
+      <label>이름 <input name="name" placeholder="(선택)" /></label>
+      <div class="row">
+        <label>리전 <input name="region" value="global" /></label>
+        <label>데이터센터 <input name="dc" value="default" /></label>
+      </div>
+      <label>수집 방식
+        <select name="method">
+          <option value="fos_rest">FOS REST API</option>
+          <option value="snmp">SNMP (v2c · 계정칸=community)</option>
+          <option value="demo">데모(합성 데이터)</option>
+        </select></label>
+      <div class="row">
+        <label>계정 <input name="username" placeholder="admin" /></label>
+        <label>비밀번호 <input name="password" type="password" /></label>
+      </div>
+      <label class="checkbox"><input type="checkbox" name="verify_tls" /> TLS 인증서 검증</label>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="add-cancel">취소</button>
+        <button type="submit" class="btn btn-primary">추가</button>
+      </div>
+    </form>
+  </div></div>
+
+  <!-- 규칙 추가 모달 -->
+  <div id="rule-modal" class="modal hidden"><div class="modal-box">
+    <h3>알림 규칙 추가</h3>
+    <form id="rule-form">
+      <label>이름 <input name="name" required /></label>
+      <label>지표
+        <select name="metric">
+          <option value="occupancy_pct">포트 점유율(%)</option>
+          <option value="error_ports">장애 포트 수</option>
+          <option value="crc_errors">CRC 에러(최대)</option>
+          <option value="sfp_rx_power_dbm">SFP 수신광(dBm)</option>
+          <option value="switch_unreachable">도달불가(1)</option>
+        </select></label>
+      <div class="row">
+        <label>조건<select name="comparator">
+          <option>&gt;</option><option>&lt;</option><option>&gt;=</option>
+          <option>&lt;=</option><option>==</option></select></label>
+        <label>임계값 <input name="threshold" type="number" step="any" value="90" /></label>
+      </div>
+      <label>심각도<select name="severity">
+        <option>info</option><option selected>warning</option><option>critical</option>
+      </select></label>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="rule-cancel">취소</button>
+        <button type="submit" class="btn btn-primary">추가</button>
+      </div>
+    </form>
+  </div></div>
+
+  <!-- 로그인 모달 -->
+  <div id="login-modal" class="modal hidden"><div class="modal-box">
+    <h3>로그인</h3>
+    <form id="login-form">
+      <label>계정 <input name="username" required /></label>
+      <label>비밀번호 <input name="password" type="password" required /></label>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="login-cancel">취소</button>
+        <button type="submit" class="btn btn-primary">로그인</button>
+      </div>
+    </form>
+  </div></div>
+
+  <!-- 스위치 상세 모달 -->
+  <div id="detail-modal" class="modal hidden"><div class="modal-box modal-lg">
+    <div class="detail-head"><h3 id="detail-title">스위치 상세</h3>
+      <button class="btn btn-ghost" id="detail-close">닫기</button></div>
+    <div id="detail-summary" class="cards small"></div>
+    <div class="chart-wrap small">
+      <svg id="detail-chart" class="chart" viewBox="0 0 800 160"
+           preserveAspectRatio="none"></svg>
+      <div id="detail-chart-empty" class="chart-empty muted">추이 데이터 없음</div>
+    </div>
+    <div class="legend">
+      <span class="dot used"></span> 사용중
+      <span class="dot free"></span> 비어있음
+      <span class="dot error"></span> 장애
+      <span class="dot warn2"></span> 경고(에러/광신호)
+    </div>
+    <div id="port-grid" class="port-grid"></div>
+  </div></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
